@@ -121,6 +121,9 @@ func (this *Worker) ReadWhitelist() error {
 }
 
 func (this *Worker) Run() error {
+
+	go worker.worker()
+
 	targetFile, err := os.Open(this.settings.ScanFile)
 	if err != nil {
 		logs.Error("%s", err)
@@ -187,6 +190,5 @@ func init() {
 
 func Start(name string, s Scanner) {
 	initWorker(name, s)
-	go worker.worker()
 	worker.Run()
 }
