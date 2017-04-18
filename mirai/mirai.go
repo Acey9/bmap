@@ -51,7 +51,7 @@ func (mirai *Mirai) Scan(target *scanner.Target) (*scanner.Response, error) {
 			msg = fmt.Sprintf("%d\t%s", MIRAI, "nil")
 			break
 		} else {
-			msg = fmt.Sprintf("%d\t%s", UNKNOWN, err)
+			msg = fmt.Sprintf("%d\t%s", UNKNOWN, "nil")
 		}
 	}
 
