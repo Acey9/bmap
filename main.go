@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/bmap/mirai"
-	"github.com/bmap/scanner"
+	"github.com/Acey9/bmap/mirai"
+	"github.com/Acey9/bmap/scanner"
 )
 
 func main() {

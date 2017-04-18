@@ -2,7 +2,7 @@ package mirai
 
 import (
 	"fmt"
-	"github.com/bmap/scanner"
+	"github.com/Acey9/bmap/scanner"
 	"net"
 	"time"
 )
