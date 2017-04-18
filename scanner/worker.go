@@ -23,6 +23,7 @@ type Settings struct {
 }
 
 type Worker struct {
+	name      string
 	scanner   Scanner
 	whitelist map[string]int
 	settings  *Settings
@@ -30,12 +31,13 @@ type Worker struct {
 	targetQueue   chan *Target
 	responseQueue chan *Response
 
-	targetCount   int
+	requestCount  int
 	responseCount int
 }
 
-func initWorker(s Scanner) {
+func initWorker(name string, s Scanner) {
 	worker = &Worker{
+		name,
 		s,
 		make(map[string]int),
 		&settings,
@@ -77,14 +79,18 @@ func (this *Worker) worker() {
 	for {
 		select {
 		case t := <-this.targetQueue:
-			this.targetCount++
+			this.requestCount++
+			//logs.Debug("-> %s", t.Addr)
 			go this.goScan(t)
 			break
 		case res := <-this.responseQueue:
 			this.responseCount++
+			/*if this.responseCount%100000 == 0 {
+				logs.Debug("Progress %d:%d", this.responseCount, this.requestCount)
+			}*/
 			out, err := this.scanner.Output(res)
 			if err == nil {
-				logs.Info("output:\t%s", out)
+				logs.Info("[%s]\t%s", this.name, out)
 			} else {
 				logs.Error(err)
 			}
@@ -123,6 +129,7 @@ func (this *Worker) Run() error {
 	defer targetFile.Close()
 
 	fielScanner := bufio.NewScanner(targetFile)
+	sleep := time.Millisecond * time.Duration(1)
 	for fielScanner.Scan() {
 		text := fielScanner.Text()
 		addr := strings.TrimSpace(text)
@@ -136,10 +143,9 @@ func (this *Worker) Run() error {
 		}
 
 		for {
-			if this.targetCount-this.responseCount < this.settings.Concurrency {
+			if this.requestCount-this.responseCount < this.settings.Concurrency {
 				break
 			} else {
-				sleep := time.Millisecond * time.Duration(1)
 				time.Sleep(sleep)
 			}
 		}
@@ -147,15 +153,12 @@ func (this *Worker) Run() error {
 		this.AddTarget(target)
 	}
 
-	//waitMillisecond := 1 * 60 * 1000
+	time.Sleep(time.Millisecond * time.Duration(5000))
 	for {
-		//if this.targetCount == this.responseCount || waitMillisecond < 0 {
-		if this.targetCount == this.responseCount {
+		if this.requestCount == this.responseCount {
 			break
 		}
-		sleep := time.Millisecond * time.Duration(1)
 		time.Sleep(sleep)
-		//waitMillisecond--
 	}
 	return nil
 }
@@ -183,7 +186,7 @@ func init() {
 }
 
 func Start(name string, s Scanner) {
-	initWorker(s)
+	initWorker(name, s)
 	go worker.worker()
 	worker.Run()
 }

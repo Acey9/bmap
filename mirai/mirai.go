@@ -10,7 +10,7 @@ import (
 const UNKNOWN int = 0
 const MIRAI int = 1
 const CONNERR int = 2
-const READERR int = 3
+const NETERROR int = 3
 const ACKLEN = 2
 const CONNTIMEOUT = 5
 const WRITETIMEOUT = 3
@@ -47,11 +47,15 @@ func (mirai *Mirai) Scan(target *scanner.Target) (*scanner.Response, error) {
 	var msg string
 	for i := 0; i < 2; i++ {
 		ck, err := bot.Login()
-		if ck {
-			msg = fmt.Sprintf("%d\t%s", MIRAI, "nil")
+		if err != nil {
+			msg = fmt.Sprintf("%d\t%s", ck, "nil")
+			continue
+		}
+		if ck == MIRAI {
+			msg = fmt.Sprintf("%d\t%s", ck, "nil")
 			break
 		} else {
-			msg = fmt.Sprintf("%d\t%s", UNKNOWN, "nil")
+			msg = fmt.Sprintf("%d\t%s", ck, "nil")
 		}
 	}
 
@@ -63,7 +67,7 @@ func NewBot(conn net.Conn, heatebeat string, loginMsg string) *Bot {
 	return &Bot{conn, heatebeat, loginMsg}
 }
 
-func (bot *Bot) Login() (bool, error) {
+func (bot *Bot) Login() (int, error) {
 	loginMsg := []byte(bot.loginMsg)
 
 	sleep := time.Millisecond * time.Duration(5)
@@ -71,14 +75,14 @@ func (bot *Bot) Login() (bool, error) {
 	bot.conn.SetWriteDeadline(time.Now().Add(time.Second * WRITETIMEOUT))
 	_, err := bot.conn.Write(loginMsg[:4])
 	if err != nil {
-		return false, err
+		return NETERROR, err
 	}
 	time.Sleep(sleep)
 
 	bot.conn.SetWriteDeadline(time.Now().Add(time.Second * WRITETIMEOUT))
 	_, err = bot.conn.Write(loginMsg[4:15])
 	if err != nil {
-		return false, err
+		return NETERROR, err
 	}
 	heartbeat := []byte(bot.heatebeat) //TODO random
 	time.Sleep(sleep)
@@ -86,7 +90,7 @@ func (bot *Bot) Login() (bool, error) {
 	bot.conn.SetWriteDeadline(time.Now().Add(time.Second * WRITETIMEOUT))
 	_, err = bot.conn.Write(heartbeat)
 	if err != nil {
-		return false, err
+		return NETERROR, err
 	}
 
 	ackBuf := make([]byte, 3)
@@ -94,14 +98,11 @@ func (bot *Bot) Login() (bool, error) {
 	bot.conn.SetReadDeadline(time.Now().Add(time.Second * READTIMEOUT))
 	n, err := bot.conn.Read(ackBuf)
 	if err != nil {
-		return false, err
+		return NETERROR, err
 	}
 
 	res := bot.confirm(n, ackBuf, heartbeat)
-	if res != MIRAI {
-		return false, nil
-	}
-	return true, nil
+	return res, nil
 }
 
 func (bot *Bot) confirm(n int, ackBuf, heartbeat []byte) int {
