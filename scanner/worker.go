@@ -118,9 +118,9 @@ func (this *Worker) Run() error {
 	}
 	defer targetFile.Close()
 
-	fielWorker := bufio.NewScanner(targetFile)
-	for fielWorker.Scan() {
-		text := fielWorker.Text()
+	fielScanner := bufio.NewScanner(targetFile)
+	for fielScanner.Scan() {
+		text := fielScanner.Text()
 		addr := strings.TrimSpace(text)
 
 		ipPort := strings.Split(addr, ":")
@@ -130,22 +130,28 @@ func (this *Worker) Run() error {
 			logs.Debug("whitelist hit %s", ip)
 			continue
 		}
+
 		for {
 			if this.targetCount-this.responseCount < this.settings.Concurrency {
 				break
+			} else {
+				sleep := time.Millisecond * time.Duration(1)
+				time.Sleep(sleep)
 			}
-			sleep := time.Millisecond * time.Duration(1)
-			time.Sleep(sleep)
 		}
 		target := &Target{addr}
 		this.AddTarget(target)
 	}
+
+	//waitMillisecond := 1 * 60 * 1000
 	for {
-		if this.targetCount-this.responseCount < this.settings.Concurrency {
+		//if this.targetCount == this.responseCount || waitMillisecond < 0 {
+		if this.targetCount == this.responseCount {
 			break
 		}
 		sleep := time.Millisecond * time.Duration(1)
 		time.Sleep(sleep)
+		//waitMillisecond--
 	}
 	return nil
 }

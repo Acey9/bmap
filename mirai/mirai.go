@@ -1,7 +1,7 @@
 package mirai
 
 import (
-	"scanner"
+	"github.com/bmap/scanner"
 )
 
 type Mirai struct {
