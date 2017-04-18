@@ -1,8 +1,8 @@
 package main
 
 import (
-	"mirai"
-	"scanner"
+	"github.com/bmap/mirai"
+	"github.com/bmap/scanner"
 )
 
 func main() {

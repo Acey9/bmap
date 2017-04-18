@@ -78,12 +78,16 @@ func (this *Worker) worker() {
 		select {
 		case t := <-this.targetQueue:
 			this.targetCount++
-			logs.Debug("-> %s", t.Addr)
 			go this.goScan(t)
 			break
 		case res := <-this.responseQueue:
 			this.responseCount++
-			logs.Debug("<- %s", res.Addr)
+			out, err := this.scanner.Output(res)
+			if err == nil {
+				logs.Info("output:\t%s", out)
+			} else {
+				logs.Error(err)
+			}
 			break
 		}
 	}
