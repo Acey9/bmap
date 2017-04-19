@@ -22,6 +22,7 @@ type Settings struct {
 	Gomaxprocs    int
 	ScanFile      string
 	WhitelistFile string
+	Args          []string
 }
 
 type Worker struct {
@@ -32,6 +33,7 @@ type Worker struct {
 
 	targetQueue   chan *Target
 	responseQueue chan *Response
+	inputQueur    chan string
 
 	requestCount  int
 	responseCount int
@@ -45,6 +47,7 @@ func initWorker(name string, s Scanner) {
 		&settings,
 		make(chan *Target),
 		make(chan *Response),
+		make(chan string),
 		0,
 		0}
 	worker.ReadWhitelist()
@@ -77,7 +80,7 @@ func (this *Worker) goScan(target *Target) {
 	this.AddResponse(res)
 }
 
-func (this *Worker) worker() {
+func (this *Worker) despatch() {
 	for {
 		select {
 		case t := <-this.targetQueue:
@@ -134,67 +137,83 @@ func (this *Worker) ReadWhitelist() error {
 	return nil
 }
 
-func (this *Worker) Run() error {
-
-	go worker.worker()
-
+func (this *Worker) scanFromFile() {
 	targetFile, err := os.Open(this.settings.ScanFile)
 	if err != nil {
 		logs.Error("%s", err)
-		return err
+		return
 	}
 	defer targetFile.Close()
 
 	fielScanner := bufio.NewScanner(targetFile)
-	sleep := time.Millisecond * time.Duration(1)
 	for fielScanner.Scan() {
-		text := fielScanner.Text()
-		addr := strings.TrimSpace(text)
-
-		ipPort := strings.Split(addr, ":")
-		ip := ipPort[0]
-		_, ok := this.whitelist[ip]
-		if ok {
-			logs.Debug("whitelist hit %s", ip)
-			continue
-		}
-
-		for {
-			if this.requestCount-this.responseCount < this.settings.Concurrency {
-				break
-			} else {
-				time.Sleep(sleep)
-			}
-		}
-		target := &Target{addr}
-		this.AddTarget(target)
+		addr := fielScanner.Text()
+		this.pushTarget(addr)
 	}
 
+}
+
+func (this *Worker) pushTarget(addr string) {
+	sleep := time.Millisecond * time.Duration(1)
+	host := strings.TrimSpace(addr)
+
+	ipPort := strings.Split(host, ":")
+	ip := ipPort[0]
+	_, ok := this.whitelist[ip]
+	if ok {
+		logs.Debug("whitelist hit %s", ip)
+		return
+	}
+
+	for {
+		if this.requestCount-this.responseCount < this.settings.Concurrency {
+			break
+		} else {
+			time.Sleep(sleep)
+		}
+	}
+	target := &Target{host}
+	this.AddTarget(target)
+}
+
+func (this *Worker) waittingEnd() {
 	time.Sleep(time.Millisecond * time.Duration(5000))
+	sleep := time.Millisecond * time.Duration(1)
 	for {
 		if this.requestCount == this.responseCount {
 			break
 		}
 		time.Sleep(sleep)
 	}
+}
+
+func (this *Worker) Run() error {
+
+	go worker.despatch()
+
+	if this.settings.ScanFile != "" {
+		this.scanFromFile()
+	} else {
+		logs.Warn("No target")
+	}
+
+	this.waittingEnd()
+
 	return nil
 }
 
 func optParse() {
-	flag.StringVar(&settings.ScanFile, "t", "./target", "Look for scan target in this directory")
-	flag.StringVar(&settings.WhitelistFile, "w", "", "Look for whitelist in this directory")
+	flag.StringVar(&settings.ScanFile, "iL", "", "Input from list of hosts/networks")
+	flag.StringVar(&settings.WhitelistFile, "w", "", "Input whitelist from list of hosts/networks")
 
-	concurrency := flag.Int("c", 10, "concurrency")
-	gomaxprocs := flag.Int("p", 0, "go max procs")
+	flag.IntVar(&settings.Concurrency, "c", 10, "concurrency")
+	flag.IntVar(&settings.Gomaxprocs, "p", 0, "go max procs")
 
 	flag.Parse()
-
-	settings.Concurrency = *concurrency
-	if *gomaxprocs == 0 {
+	if settings.Gomaxprocs == 0 {
 		settings.Gomaxprocs = runtime.NumCPU()
-	} else {
-		settings.Gomaxprocs = *gomaxprocs
 	}
+	settings.Args = flag.Args()
 }
 
 func init() {
