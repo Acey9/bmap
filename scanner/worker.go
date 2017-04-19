@@ -4,7 +4,9 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"github.com/Acey9/bmap/common"
 	"github.com/astaxie/beego/logs"
+	"net"
 	"os"
 	"runtime"
 	"strings"
@@ -90,7 +92,7 @@ func (this *Worker) worker() {
 			}*/
 			out, err := this.scanner.Output(res)
 			if err == nil {
-				logs.Info("[%s]\t%s", this.name, out)
+				logs.Info("%s %s", this.name, out)
 			} else {
 				logs.Error(err)
 			}
@@ -115,7 +117,19 @@ func (this *Worker) ReadWhitelist() error {
 	for wl.Scan() {
 		text := wl.Text()
 		line := strings.TrimSpace(text)
-		this.whitelist[line] = 1
+		ip := net.ParseIP(line)
+		if ip != nil {
+			this.whitelist[line] = 1
+			continue
+		}
+		ips, err := common.CIDR2IP(line)
+		if err != nil {
+			logs.Error("Whitelist %s", err)
+			continue
+		}
+		for _, ipStr := range ips {
+			this.whitelist[ipStr] = 1
+		}
 	}
 	return nil
 }
