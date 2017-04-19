@@ -2,28 +2,19 @@ package scanner
 
 import (
 	"bufio"
-	"flag"
+	"bytes"
 	"fmt"
 	"github.com/Acey9/bmap/common"
 	"github.com/astaxie/beego/logs"
 	"net"
 	"os"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 )
 
-var settings Settings
-
 var worker *Worker
-
-type Settings struct {
-	Concurrency   int
-	Gomaxprocs    int
-	ScanFile      string
-	WhitelistFile string
-	Args          []string
-}
 
 type Worker struct {
 	name      string
@@ -120,24 +111,25 @@ func (this *Worker) ReadWhitelist() error {
 	for wl.Scan() {
 		text := wl.Text()
 		line := strings.TrimSpace(text)
-		ip := net.ParseIP(line)
-		if ip != nil {
+		i := strings.IndexByte(line, '/')
+		if i < 0 {
 			this.whitelist[line] = 1
 			continue
-		}
-		ips, err := common.CIDR2IP(line)
-		if err != nil {
-			logs.Error("Whitelist %s", err)
-			continue
-		}
-		for _, ipStr := range ips {
-			this.whitelist[ipStr] = 1
+		} else {
+			ips, err := common.CIDR2IP(line)
+			if err != nil {
+				logs.Error("Whitelist %s", err)
+				continue
+			}
+			for _, ipStr := range ips {
+				this.whitelist[ipStr] = 1
+			}
 		}
 	}
 	return nil
 }
 
-func (this *Worker) scanFromFile() {
+func (this *Worker) parseList() {
 	targetFile, err := os.Open(this.settings.ScanFile)
 	if err != nil {
 		logs.Error("%s", err)
@@ -149,6 +141,51 @@ func (this *Worker) scanFromFile() {
 	for fielScanner.Scan() {
 		addr := fielScanner.Text()
 		this.pushTarget(addr)
+	}
+
+}
+
+func (this *Worker) pushIP(ip string) {
+	for _, port := range this.settings.Ports {
+		t := bytes.Buffer{}
+		t.WriteString(ip)
+		t.WriteString(":")
+		t.WriteString(strconv.Itoa(port))
+		this.pushTarget(t.String())
+	}
+}
+
+func (this *Worker) parseInput() {
+	var inputs []string
+
+	args := this.settings.Args[0]
+	i := strings.IndexByte(args, ',')
+	if i < 0 {
+		inputs = append(inputs, args)
+	} else {
+		inputs = strings.Split(args, ",")
+	}
+
+	for _, input := range inputs {
+		if input == "" {
+			continue
+		}
+
+		i := strings.IndexByte(input, '/')
+		if i < 0 {
+			this.pushIP(input)
+		} else {
+			ip, ipnet, err := net.ParseCIDR(input)
+			if err != nil {
+				logs.Error("input %s", err)
+				continue
+			}
+
+			for ip := ip.Mask(ipnet.Mask); ipnet.Contains(ip); common.Inc(ip) {
+				this.pushIP(ip.String())
+			}
+		}
+
 	}
 
 }
@@ -192,28 +229,14 @@ func (this *Worker) Run() error {
 	go worker.despatch()
 
 	if this.settings.ScanFile != "" {
-		this.scanFromFile()
+		this.parseList()
 	} else {
-		logs.Warn("No target")
+		this.parseInput()
 	}
 
 	this.waittingEnd()
 
 	return nil
-}
-
-func optParse() {
-	flag.StringVar(&settings.ScanFile, "iL", "", "Input from list of hosts/networks")
-	flag.StringVar(&settings.WhitelistFile, "w", "", "Input whitelist from list of hosts/networks")
-
-	flag.IntVar(&settings.Concurrency, "c", 10, "concurrency")
-	flag.IntVar(&settings.Gomaxprocs, "p", 0, "go max procs")
-
-	flag.Parse()
-	if settings.Gomaxprocs == 0 {
-		settings.Gomaxprocs = runtime.NumCPU()
-	}
-	settings.Args = flag.Args()
 }
 
 func init() {

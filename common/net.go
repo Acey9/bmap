@@ -4,7 +4,7 @@ import (
 	"net"
 )
 
-func inc(ip net.IP) {
+func Inc(ip net.IP) {
 	for j := len(ip) - 1; j >= 0; j-- {
 		ip[j]++
 		if ip[j] > 0 {
@@ -27,7 +27,7 @@ func CIDR2IP(s string) (ips []string, err error) {
 		return
 	}
 
-	for ip := ip.Mask(ipnet.Mask); ipnet.Contains(ip); inc(ip) {
+	for ip := ip.Mask(ipnet.Mask); ipnet.Contains(ip); Inc(ip) {
 		ips = append(ips, ip.String())
 	}
 	return
