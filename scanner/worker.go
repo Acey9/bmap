@@ -71,6 +71,22 @@ func (this *Worker) goScan(target *Target) {
 	this.AddResponse(res)
 }
 
+func (this *Worker) output(res *Response) {
+
+	defer func() {
+		if err := recover(); err != nil {
+			logs.Error(err)
+		}
+	}()
+
+	out, err := this.scanner.Output(res)
+	if err == nil {
+		logs.Info("%s %s", this.name, out)
+	} else {
+		logs.Error(err)
+	}
+}
+
 func (this *Worker) despatch() {
 	for {
 		select {
@@ -84,12 +100,7 @@ func (this *Worker) despatch() {
 			/*if this.responseCount%100000 == 0 {
 				logs.Debug("Progress %d:%d", this.responseCount, this.requestCount)
 			}*/
-			out, err := this.scanner.Output(res)
-			if err == nil {
-				logs.Info("%s %s", this.name, out)
-			} else {
-				logs.Error(err)
-			}
+			this.output(res)
 			break
 		}
 	}
@@ -142,17 +153,6 @@ func (this *Worker) parseList() {
 		addr := fielScanner.Text()
 		this.pushTarget(addr)
 	}
-
-}
-
-func (this *Worker) pushIP(ip string) {
-	for _, port := range this.settings.Ports {
-		t := bytes.Buffer{}
-		t.WriteString(ip)
-		t.WriteString(":")
-		t.WriteString(strconv.Itoa(port))
-		this.pushTarget(t.String())
-	}
 }
 
 func (this *Worker) parseInput() {
@@ -173,7 +173,7 @@ func (this *Worker) parseInput() {
 
 		i := strings.IndexByte(input, '/')
 		if i < 0 {
-			this.pushIP(input)
+			this.pushIP(input, this.settings.Ports)
 		} else {
 			ip, ipnet, err := net.ParseCIDR(input)
 			if err != nil {
@@ -182,12 +182,22 @@ func (this *Worker) parseInput() {
 			}
 
 			for ip := ip.Mask(ipnet.Mask); ipnet.Contains(ip); common.Inc(ip) {
-				this.pushIP(ip.String())
+				this.pushIP(ip.String(), this.settings.Ports)
 			}
 		}
 
 	}
 
+}
+
+func (this *Worker) pushIP(ip string, ports []int) {
+	for _, port := range ports {
+		t := bytes.Buffer{}
+		t.WriteString(ip)
+		t.WriteString(":")
+		t.WriteString(strconv.Itoa(port))
+		this.pushTarget(t.String())
+	}
 }
 
 func (this *Worker) pushTarget(addr string) {
