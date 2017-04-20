@@ -80,10 +80,11 @@ func (this *Worker) output(res *Response) {
 	}()
 
 	out, err := this.scanner.Output(res)
-	if err == nil {
-		logs.Info("%s %s", this.name, out)
-	} else {
+	if err != nil {
 		logs.Error(err)
+	}
+	if out != "" {
+		logs.Info("%s %s", this.name, out)
 	}
 }
 
@@ -140,7 +141,7 @@ func (this *Worker) ReadWhitelist() error {
 	return nil
 }
 
-func (this *Worker) parseList() {
+func (this *Worker) listParse() {
 	targetFile, err := os.Open(this.settings.ScanFile)
 	if err != nil {
 		logs.Error("%s", err)
@@ -151,11 +152,14 @@ func (this *Worker) parseList() {
 	fielScanner := bufio.NewScanner(targetFile)
 	for fielScanner.Scan() {
 		addr := fielScanner.Text()
+		if addr == "" {
+			continue
+		}
 		this.pushTarget(addr)
 	}
 }
 
-func (this *Worker) parseInput() {
+func (this *Worker) inputParse() {
 	var inputs []string
 
 	args := this.settings.Args[0]
@@ -173,7 +177,7 @@ func (this *Worker) parseInput() {
 
 		i := strings.IndexByte(input, '/')
 		if i < 0 {
-			this.pushIP(input, this.settings.Ports)
+			this.pushHost(input)
 		} else {
 			ip, ipnet, err := net.ParseCIDR(input)
 			if err != nil {
@@ -182,7 +186,7 @@ func (this *Worker) parseInput() {
 			}
 
 			for ip := ip.Mask(ipnet.Mask); ipnet.Contains(ip); common.Inc(ip) {
-				this.pushIP(ip.String(), this.settings.Ports)
+				this.pushHost(ip.String())
 			}
 		}
 
@@ -190,8 +194,8 @@ func (this *Worker) parseInput() {
 
 }
 
-func (this *Worker) pushIP(ip string, ports []int) {
-	for _, port := range ports {
+func (this *Worker) pushHost(ip string) {
+	for _, port := range this.settings.Ports {
 		t := bytes.Buffer{}
 		t.WriteString(ip)
 		t.WriteString(":")
@@ -223,7 +227,7 @@ func (this *Worker) pushTarget(addr string) {
 	this.AddTarget(target)
 }
 
-func (this *Worker) waittingEnd() {
+func (this *Worker) waittingForEnd() {
 	time.Sleep(time.Millisecond * time.Duration(5000))
 	sleep := time.Millisecond * time.Duration(1)
 	for {
@@ -239,12 +243,12 @@ func (this *Worker) Run() error {
 	go worker.despatch()
 
 	if this.settings.ScanFile != "" {
-		this.parseList()
+		this.listParse()
 	} else {
-		this.parseInput()
+		this.inputParse()
 	}
 
-	this.waittingEnd()
+	this.waittingForEnd()
 
 	return nil
 }

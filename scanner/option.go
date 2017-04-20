@@ -20,7 +20,7 @@ type Settings struct {
 	Ports         []int
 }
 
-func ParsePorts(portStr string) (ports []int, err error) {
+func portsParse(portStr string) (ports []int, err error) {
 
 	if portStr == "" {
 		return ports, err
@@ -62,7 +62,7 @@ func optParse() {
 
 	flag.Parse()
 
-	ports, err := ParsePorts(*s)
+	ports, err := portsParse(*s)
 	if err == nil {
 		settings.Ports = ports
 	}
