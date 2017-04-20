@@ -1,6 +1,7 @@
 package scanner
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -20,29 +21,74 @@ type Settings struct {
 	Ports         []int
 }
 
+func splitComma(s string) []string {
+	var buf []string
+	i := strings.IndexByte(s, ',')
+	if i < 0 {
+		buf = append(buf, s)
+	} else {
+		for _, ss := range strings.Split(s, ",") {
+			buf = append(buf, ss)
+		}
+	}
+	return buf
+}
+
+func portRange(s string) (min, max int, err error) {
+	i := strings.IndexByte(s, '-')
+	if i < 0 {
+		min, err := strconv.Atoi(s)
+		if err != nil {
+			return min, max, err
+		}
+		max = min
+		return min, max, err
+	} else {
+		tmp := strings.Split(s, "-")
+		if len(tmp) != 2 {
+			return min, max, errors.New("range error")
+		}
+		min, err := strconv.Atoi(tmp[0])
+		if err != nil {
+			return min, max, err
+		}
+
+		max, err := strconv.Atoi(tmp[1])
+		if err != nil {
+			return min, max, err
+		}
+
+		if min < max {
+			return min, max, nil
+		} else {
+			return max, min, nil
+		}
+	}
+	return min, max, err
+}
+
 func portsParse(portStr string) (ports []int, err error) {
 
 	if portStr == "" {
 		return ports, err
 	}
 
-	i := strings.IndexByte(portStr, ',')
-	if i < 0 {
-		port, err := strconv.Atoi(portStr)
+	list := splitComma(portStr)
+
+	portSet := NewSet()
+	for _, s := range list {
+		min, max, err := portRange(s)
 		if err != nil {
 			return ports, err
 		}
-		ports = append(ports, port)
-	} else {
-		for _, p := range strings.Split(portStr, ",") {
-			port, err := strconv.Atoi(p)
-			if err != nil {
-				return ports, err
-			}
-			ports = append(ports, port)
+		if max > 65535 {
+			return ports, errors.New("The port maximum value is 65535.")
+		}
+		for i := min; i <= max; i++ {
+			portSet.Add(i)
 		}
 	}
-	return ports, nil
+	return portSet.List(), nil
 }
 
 func optParse() {
@@ -63,14 +109,18 @@ func optParse() {
 	flag.Parse()
 
 	ports, err := portsParse(*s)
-	if err == nil {
-		settings.Ports = ports
+	if err != nil {
+		flag.Usage()
+		fmt.Println(err)
+		os.Exit(1)
 	}
+	settings.Ports = ports
 
 	settings.Args = flag.Args()
 
 	if settings.ScanFile == "" && (len(settings.Args) < 1 || (len(settings.Args) > 0 && len(settings.Ports) < 1)) {
 		flag.Usage()
+		fmt.Println("Option error.")
 		os.Exit(1)
 	}
 
