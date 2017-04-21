@@ -199,7 +199,7 @@ func (this *Worker) pushHost(ip string) {
 		t := bytes.Buffer{}
 		t.WriteString(ip)
 		t.WriteString(":")
-		t.WriteString(strconv.Itoa(port))
+		t.WriteString(strconv.Itoa(int(port)))
 		this.pushTarget(t.String())
 	}
 }

@@ -18,7 +18,7 @@ type Settings struct {
 	ScanFile      string
 	WhitelistFile string
 	Args          []string
-	Ports         []int
+	Ports         []uint16
 }
 
 func splitComma(s string) []string {
@@ -34,13 +34,14 @@ func splitComma(s string) []string {
 	return buf
 }
 
-func portRange(s string) (min, max int, err error) {
+func portRange(s string) (min, max uint16, err error) {
 	i := strings.IndexByte(s, '-')
 	if i < 0 {
-		min, err := strconv.Atoi(s)
+		m, err := strconv.Atoi(s)
 		if err != nil {
 			return min, max, err
 		}
+		min = uint16(m)
 		max = min
 		return min, max, err
 	} else {
@@ -48,16 +49,18 @@ func portRange(s string) (min, max int, err error) {
 		if len(tmp) != 2 {
 			return min, max, errors.New("range error")
 		}
-		min, err := strconv.Atoi(tmp[0])
+		m, err := strconv.Atoi(tmp[0])
+		if err != nil {
+			return min, max, err
+		}
+		min = uint16(m)
+
+		m, err = strconv.Atoi(tmp[1])
 		if err != nil {
 			return min, max, err
 		}
 
-		max, err := strconv.Atoi(tmp[1])
-		if err != nil {
-			return min, max, err
-		}
-
+		max = uint16(m)
 		if min < max {
 			return min, max, nil
 		} else {
@@ -67,7 +70,7 @@ func portRange(s string) (min, max int, err error) {
 	return min, max, err
 }
 
-func portsParse(portStr string) (ports []int, err error) {
+func portsParse(portStr string) (ports []uint16, err error) {
 
 	if portStr == "" {
 		return ports, err
