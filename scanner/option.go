@@ -1,9 +1,13 @@
 package scanner
 
 import (
+	"bufio"
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/Acey9/bmap/common"
+	"github.com/astaxie/beego/logs"
+	"net"
 	"os"
 	"runtime"
 	"strconv"
@@ -92,6 +96,59 @@ func portsParse(portStr string) (ports []uint16, err error) {
 		}
 	}
 	return portSet.List(), nil
+}
+
+func listParse() {
+	targetFile, err := os.Open(settings.ScanFile)
+	if err != nil {
+		logs.Error("%s", err)
+		return
+	}
+	defer targetFile.Close()
+
+	fielScanner := bufio.NewScanner(targetFile)
+	for fielScanner.Scan() {
+		addr := fielScanner.Text()
+		if addr == "" {
+			continue
+		}
+		worker.pushTarget(addr)
+	}
+}
+
+func inputParse() {
+	var inputs []string
+
+	args := settings.Args[0]
+	i := strings.IndexByte(args, ',')
+	if i < 0 {
+		inputs = append(inputs, args)
+	} else {
+		inputs = strings.Split(args, ",")
+	}
+
+	for _, input := range inputs {
+		if input == "" {
+			continue
+		}
+
+		i := strings.IndexByte(input, '/')
+		if i < 0 {
+			worker.pushHost(input)
+		} else {
+			ip, ipnet, err := net.ParseCIDR(input)
+			if err != nil {
+				logs.Error("input %s", err)
+				continue
+			}
+
+			for ip := ip.Mask(ipnet.Mask); ipnet.Contains(ip); common.Inc(ip) {
+				worker.pushHost(ip.String())
+			}
+		}
+
+	}
+
 }
 
 func optParse() {

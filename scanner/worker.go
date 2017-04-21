@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/Acey9/bmap/common"
 	"github.com/astaxie/beego/logs"
-	"net"
 	"os"
 	"runtime"
 	"strconv"
@@ -24,7 +23,6 @@ type Worker struct {
 
 	targetQueue   chan *Target
 	responseQueue chan *Response
-	inputQueur    chan string
 
 	requestCount  int
 	responseCount int
@@ -38,10 +36,9 @@ func initWorker(name string, s Scanner) {
 		&settings,
 		make(chan *Target),
 		make(chan *Response),
-		make(chan string),
 		0,
 		0}
-	worker.ReadWhitelist()
+	worker.loadWhitelist()
 }
 
 func (this *Worker) AddTarget(t *Target) {
@@ -107,7 +104,7 @@ func (this *Worker) despatch() {
 	}
 }
 
-func (this *Worker) ReadWhitelist() error {
+func (this *Worker) loadWhitelist() error {
 	if this.settings.WhitelistFile == "" {
 		logs.Warn("Whitelist nonexist.")
 		return nil
@@ -139,59 +136,6 @@ func (this *Worker) ReadWhitelist() error {
 		}
 	}
 	return nil
-}
-
-func (this *Worker) listParse() {
-	targetFile, err := os.Open(this.settings.ScanFile)
-	if err != nil {
-		logs.Error("%s", err)
-		return
-	}
-	defer targetFile.Close()
-
-	fielScanner := bufio.NewScanner(targetFile)
-	for fielScanner.Scan() {
-		addr := fielScanner.Text()
-		if addr == "" {
-			continue
-		}
-		this.pushTarget(addr)
-	}
-}
-
-func (this *Worker) inputParse() {
-	var inputs []string
-
-	args := this.settings.Args[0]
-	i := strings.IndexByte(args, ',')
-	if i < 0 {
-		inputs = append(inputs, args)
-	} else {
-		inputs = strings.Split(args, ",")
-	}
-
-	for _, input := range inputs {
-		if input == "" {
-			continue
-		}
-
-		i := strings.IndexByte(input, '/')
-		if i < 0 {
-			this.pushHost(input)
-		} else {
-			ip, ipnet, err := net.ParseCIDR(input)
-			if err != nil {
-				logs.Error("input %s", err)
-				continue
-			}
-
-			for ip := ip.Mask(ipnet.Mask); ipnet.Contains(ip); common.Inc(ip) {
-				this.pushHost(ip.String())
-			}
-		}
-
-	}
-
 }
 
 func (this *Worker) pushHost(ip string) {
@@ -243,9 +187,9 @@ func (this *Worker) Run() error {
 	go worker.despatch()
 
 	if this.settings.ScanFile != "" {
-		this.listParse()
+		listParse()
 	} else {
-		this.inputParse()
+		inputParse()
 	}
 
 	this.waittingForEnd()
