@@ -6,6 +6,10 @@ import (
 	"fmt"
 	"github.com/Acey9/bmap/common"
 	"github.com/astaxie/beego/logs"
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
+	"github.com/google/gopacket/pcap"
+	"net"
 	"os"
 	"runtime"
 	"strconv"
@@ -26,22 +30,31 @@ type Worker struct {
 
 	requestCount  int
 	responseCount int
+	synscanner    *SynScanner
 }
 
-func initWorker(name string, s Scanner) {
+func initWorker(name string, s Scanner) error {
 	worker = &Worker{
-		name,
-		s,
-		make(map[string]int),
-		&settings,
-		make(chan *Target),
-		make(chan *Response),
-		0,
-		0}
+		name:          name,
+		scanner:       s,
+		whitelist:     make(map[string]int),
+		settings:      &settings,
+		targetQueue:   make(chan *Target),
+		responseQueue: make(chan *Response),
+		requestCount:  0,
+		responseCount: 0}
 	worker.loadWhitelist()
+
+	synscanner, err := NewSynScanner()
+	if err != nil {
+		return err
+	}
+	worker.synscanner = synscanner
+	return nil
 }
 
-func (this *Worker) AddTarget(t *Target) {
+func (this *Worker) AddTarget(host string) {
+	t := &Target{host}
 	this.targetQueue <- t
 }
 
@@ -82,6 +95,47 @@ func (this *Worker) output(res *Response) {
 	}
 	if out != "" {
 		logs.Info("%s %s", this.name, out)
+	}
+}
+
+func (this *Worker) readSynAck() {
+	for {
+
+		data, _, err := this.synscanner.handle.ReadPacketData()
+		if err == pcap.NextErrorTimeoutExpired {
+			continue
+		} else if err != nil {
+			logs.Error("error reading packet: %v", err)
+			continue
+		}
+
+		packet := gopacket.NewPacket(data, layers.LayerTypeEthernet, gopacket.NoCopy)
+
+		if net := packet.NetworkLayer(); net == nil {
+		} else if ipLayer := packet.Layer(layers.LayerTypeIPv4); ipLayer == nil {
+			//
+		} else if ip, ok := ipLayer.(*layers.IPv4); !ok {
+			//
+		} else if tcpLayer := packet.Layer(layers.LayerTypeTCP); tcpLayer == nil {
+			//
+		} else if tcp, ok := tcpLayer.(*layers.TCP); !ok {
+			//
+		} else if tcp.DstPort != 54321 {
+			//
+		} else if tcp.RST {
+			//
+		} else if tcp.SYN && tcp.ACK {
+
+			target := bytes.Buffer{}
+			target.WriteString(ip.SrcIP.String())
+			target.WriteString(":")
+			target.WriteString(strconv.Itoa(int(tcp.SrcPort)))
+			this.AddTarget(target.String())
+
+			//logs.Info("%v  port %v open", ip.SrcIP, tcp.SrcPort)
+		} else {
+			//
+		}
 	}
 }
 
@@ -153,10 +207,11 @@ func (this *Worker) pushTarget(addr string) {
 	host := strings.TrimSpace(addr)
 
 	ipPort := strings.Split(host, ":")
-	ip := ipPort[0]
-	_, ok := this.whitelist[ip]
+	ipStr := ipPort[0]
+	portStr := ipPort[1]
+	_, ok := this.whitelist[ipStr]
 	if ok {
-		logs.Debug("whitelist hit %s", ip)
+		logs.Debug("whitelist hit %s", ipStr)
 		return
 	}
 
@@ -167,8 +222,22 @@ func (this *Worker) pushTarget(addr string) {
 			time.Sleep(sleep)
 		}
 	}
-	target := &Target{host}
-	this.AddTarget(target)
+
+	ip := net.ParseIP(ipStr)
+	if ip != nil {
+		if ip = ip.To4(); ip == nil {
+			logs.Error("ip.To4 error.")
+			return
+		}
+		port, err := strconv.Atoi(portStr)
+		if err != nil {
+			logs.Error(err)
+			return
+		}
+		this.synscanner.syn(ip, layers.TCPPort(port))
+	} else {
+		this.AddTarget(host)
+	}
 }
 
 func (this *Worker) waittingForEnd() {
@@ -184,7 +253,8 @@ func (this *Worker) waittingForEnd() {
 
 func (this *Worker) Run() error {
 
-	go worker.despatch()
+	go this.despatch()
+	go this.readSynAck()
 
 	if this.settings.ScanFile != "" {
 		listParse()
@@ -203,6 +273,12 @@ func init() {
 }
 
 func Start(name string, s Scanner) {
-	initWorker(name, s)
+	err := initWorker(name, s)
+	if err != nil {
+		fmt.Println(err)
+		logs.Error(err)
+		return
+	}
+	defer worker.synscanner.close()
 	worker.Run()
 }
