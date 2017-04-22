@@ -1,6 +1,7 @@
 package scanner
 
 import (
+	"encoding/binary"
 	"errors"
 	"net"
 	"time"
@@ -133,6 +134,18 @@ func (s *SynScanner) send(l ...gopacket.SerializableLayer) error {
 	return s.handle.WritePacketData(s.buf.Bytes())
 }
 
+func (s *SynScanner) Seq(ip net.IP) uint32 {
+	if len(ip) == 16 {
+		return binary.LittleEndian.Uint32(ip[12:16])
+	}
+	return binary.LittleEndian.Uint32(ip)
+}
+
+func (s *SynScanner) Sport(ip net.IP) layers.TCPPort {
+	isn := s.Seq(ip)
+	return layers.TCPPort(isn >> 16)
+}
+
 // scan scans the dst IP address of this SynScanner.
 func (s *SynScanner) syn(dst net.IP, dport layers.TCPPort) error {
 	// Construct all the network layers we need.
@@ -150,7 +163,8 @@ func (s *SynScanner) syn(dst net.IP, dport layers.TCPPort) error {
 		Protocol: layers.IPProtocolTCP,
 	}
 	tcp := layers.TCP{
-		SrcPort: 54321,
+		Seq:     s.Seq(dst) - 1,
+		SrcPort: s.Sport(dst),
 		DstPort: dport, // will be incremented during the scan
 		SYN:     true,
 	}

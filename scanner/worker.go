@@ -127,11 +127,11 @@ func (this *Worker) readSynAck() {
 			//
 		} else if tcp, ok := tcpLayer.(*layers.TCP); !ok {
 			//
-		} else if tcp.DstPort != 54321 {
+		} else if tcp.DstPort != this.synscanner.Sport(ip.SrcIP) {
 			//
 		} else if tcp.RST {
 			//
-		} else if tcp.SYN && tcp.ACK {
+		} else if tcp.SYN && tcp.ACK && tcp.Ack == this.synscanner.Seq(ip.SrcIP) {
 
 			addr := bytes.Buffer{}
 			addr.WriteString(ip.SrcIP.String())
