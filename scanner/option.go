@@ -88,6 +88,10 @@ func portsParse(portStr string) (ports []uint16, err error) {
 		if err != nil {
 			return ports, err
 		}
+		if min == max {
+			portSet.Add(min)
+			return portSet.List(), nil
+		}
 		if max > 65535 {
 			return ports, errors.New("The port maximum value is 65535.")
 		}
