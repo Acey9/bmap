@@ -31,6 +31,7 @@ type Worker struct {
 	requestCount  int
 	responseCount int
 	synscanner    *SynScanner
+	active        time.Time
 }
 
 func initWorker(name string, s Scanner) error {
@@ -50,6 +51,7 @@ func initWorker(name string, s Scanner) error {
 		return err
 	}
 	worker.synscanner = synscanner
+	worker.active = time.Now()
 	return nil
 }
 
@@ -89,6 +91,11 @@ func (this *Worker) output(res *Response) {
 		}
 	}()
 
+	if this.settings.SynScan {
+		logs.Info("%s open", res.Addr)
+		return
+	}
+
 	out, err := this.scanner.Output(res)
 	if err != nil {
 		logs.Error(err)
@@ -126,11 +133,18 @@ func (this *Worker) readSynAck() {
 			//
 		} else if tcp.SYN && tcp.ACK {
 
-			target := bytes.Buffer{}
-			target.WriteString(ip.SrcIP.String())
-			target.WriteString(":")
-			target.WriteString(strconv.Itoa(int(tcp.SrcPort)))
-			this.AddTarget(target.String())
+			addr := bytes.Buffer{}
+			addr.WriteString(ip.SrcIP.String())
+			addr.WriteString(":")
+			addr.WriteString(strconv.Itoa(int(tcp.SrcPort)))
+
+			if this.settings.SynScan {
+				resp := bytes.Buffer{}
+				resp.WriteString("open")
+				this.AddResponse(&Response{addr.String(), resp.String()})
+			} else {
+				this.AddTarget(addr.String())
+			}
 
 			//logs.Info("%v  port %v open", ip.SrcIP, tcp.SrcPort)
 		} else {
@@ -215,11 +229,13 @@ func (this *Worker) pushTarget(addr string) {
 		return
 	}
 
-	for {
-		if this.requestCount-this.responseCount < this.settings.Concurrency {
-			break
-		} else {
-			time.Sleep(sleep)
+	if !this.settings.SynScan {
+		for {
+			if this.requestCount-this.responseCount < this.settings.Concurrency {
+				break
+			} else {
+				time.Sleep(sleep)
+			}
 		}
 	}
 
@@ -234,17 +250,18 @@ func (this *Worker) pushTarget(addr string) {
 			logs.Error(err)
 			return
 		}
+		this.active = time.Now()
 		this.synscanner.syn(ip, layers.TCPPort(port))
 	} else {
+		this.active = time.Now()
 		this.AddTarget(host)
 	}
 }
 
 func (this *Worker) waittingForEnd() {
-	time.Sleep(time.Millisecond * time.Duration(5000))
 	sleep := time.Millisecond * time.Duration(1)
 	for {
-		if this.requestCount == this.responseCount {
+		if time.Since(this.active) > time.Second*time.Duration(this.settings.Timeout) {
 			break
 		}
 		time.Sleep(sleep)

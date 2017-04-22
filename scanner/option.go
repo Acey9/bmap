@@ -23,6 +23,8 @@ type Settings struct {
 	WhitelistFile string
 	Args          []string
 	Ports         []uint16
+	SynScan       bool
+	Timeout       int
 }
 
 func splitComma(s string) []string {
@@ -165,8 +167,11 @@ func optParse() {
 	flag.StringVar(&settings.ScanFile, "iL", "", "Input from list of hosts/networks")
 	flag.StringVar(&settings.WhitelistFile, "w", "", "Input whitelist from list of hosts/networks")
 
+	flag.BoolVar(&settings.SynScan, "sS", false, "Only syn scan")
+
 	flag.IntVar(&settings.Concurrency, "c", 10, "Concurrency")
 	flag.IntVar(&settings.Gomaxprocs, "g", 0, "Go max procs")
+	flag.IntVar(&settings.Timeout, "t", 60, "Timeout for all scan to end.")
 
 	s := flag.String("p", "", "Ports")
 
@@ -184,7 +189,6 @@ func optParse() {
 
 	if settings.ScanFile == "" && (len(settings.Args) < 1 || (len(settings.Args) > 0 && len(settings.Ports) < 1)) {
 		flag.Usage()
-		fmt.Println("Option error.")
 		os.Exit(1)
 	}
 
