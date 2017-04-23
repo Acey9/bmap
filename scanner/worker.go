@@ -55,6 +55,10 @@ func initWorker(name string, s Scanner) error {
 	return nil
 }
 
+func (this *Worker) Close() {
+	this.synscanner.Close()
+}
+
 func (this *Worker) AddTarget(host string) {
 	t := &Target{host}
 	this.targetQueue <- t
@@ -206,10 +210,10 @@ func (this *Worker) loadWhitelist() error {
 	return nil
 }
 
-func (this *Worker) pushHost(ip string) {
+func (this *Worker) pushHost(host string) {
 	for _, port := range this.settings.Ports {
 		t := bytes.Buffer{}
-		t.WriteString(ip)
+		t.WriteString(host)
 		t.WriteString(":")
 		t.WriteString(strconv.Itoa(int(port)))
 		this.pushTarget(t.String())
@@ -221,6 +225,10 @@ func (this *Worker) pushTarget(addr string) {
 	host := strings.TrimSpace(addr)
 
 	ipPort := strings.Split(host, ":")
+	if len(ipPort) != 2 {
+		logs.Error("Scann addr error. %s", addr)
+		return
+	}
 	ipStr := ipPort[0]
 	portStr := ipPort[1]
 	_, ok := this.whitelist[ipStr]
@@ -251,7 +259,7 @@ func (this *Worker) pushTarget(addr string) {
 			return
 		}
 		this.active = time.Now()
-		this.synscanner.syn(ip, layers.TCPPort(port))
+		this.synscanner.Syn(ip, layers.TCPPort(port))
 	} else {
 		this.active = time.Now()
 		this.AddTarget(host)
@@ -269,6 +277,8 @@ func (this *Worker) waittingForEnd() {
 }
 
 func (this *Worker) Run() error {
+
+	defer this.Close()
 
 	go this.despatch()
 	go this.readSynAck()
@@ -296,6 +306,5 @@ func Start(name string, s Scanner) {
 		logs.Error(err)
 		return
 	}
-	defer worker.synscanner.close()
 	worker.Run()
 }

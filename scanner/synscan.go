@@ -68,7 +68,7 @@ func NewSynScanner() (*SynScanner, error) {
 }
 
 // close cleans up the handle.
-func (s *SynScanner) close() {
+func (s *SynScanner) Close() {
 	s.handle.Close()
 }
 
@@ -147,7 +147,7 @@ func (s *SynScanner) Sport(ip net.IP) layers.TCPPort {
 }
 
 // scan scans the dst IP address of this SynScanner.
-func (s *SynScanner) syn(dst net.IP, dport layers.TCPPort) error {
+func (s *SynScanner) Syn(dst net.IP, dport layers.TCPPort) error {
 	// Construct all the network layers we need.
 	eth := layers.Ethernet{
 		SrcMAC:       s.iface.HardwareAddr,
