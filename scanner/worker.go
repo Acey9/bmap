@@ -95,10 +95,10 @@ func (this *Worker) output(res *Response) {
 		}
 	}()
 
-	if this.settings.SynScan {
+	/*if this.settings.SynScan {
 		logs.Info("%s open", res.Addr)
 		return
-	}
+	}*/
 
 	out, err := this.scanner.Output(res)
 	if err != nil {
@@ -136,6 +136,7 @@ func (this *Worker) readSynAck() {
 		} else if tcp.RST {
 			//
 		} else if tcp.SYN && tcp.ACK && tcp.Ack == this.synscanner.Seq(ip.SrcIP) {
+			//fmt.Println(ip.SrcIP, tcp.SrcPort, ip.DstIP, tcp.DstPort, tcp.Seq, tcp.Ack)
 
 			addr := bytes.Buffer{}
 			addr.WriteString(ip.SrcIP.String())
@@ -260,6 +261,18 @@ func (this *Worker) pushTarget(addr string) {
 		}
 		this.active = time.Now()
 		this.synscanner.Syn(ip, layers.TCPPort(port))
+	} else if ip, err := net.LookupIP(ipStr); err == nil {
+		port, err := strconv.Atoi(portStr)
+		if err != nil {
+			logs.Error(err)
+			return
+		}
+		this.active = time.Now()
+		if len(ip) > 0 {
+			this.synscanner.Syn(ip[0], layers.TCPPort(port))
+		} else {
+			logs.Warn("%s resolution failed", ipStr)
+		}
 	} else {
 		this.active = time.Now()
 		this.AddTarget(host)

@@ -3,6 +3,7 @@ package scanner
 import (
 	"encoding/binary"
 	"errors"
+	//"fmt"
 	"net"
 	"time"
 
@@ -169,6 +170,8 @@ func (s *SynScanner) Syn(dst net.IP, dport layers.TCPPort) error {
 		SYN:     true,
 	}
 	tcp.SetNetworkLayerForChecksum(&ip4)
+
+	//fmt.Println("send:", dst.String(), dport, s.Seq(dst)-1, s.Sport(dst))
 
 	if err := s.send(&eth, &ip4, &tcp); err != nil {
 		logs.Error("error sending to port %v: %v", tcp.DstPort, err)
