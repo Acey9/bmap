@@ -275,9 +275,18 @@ func (this *Worker) pushTarget(addr string) {
 		}
 		if len(ip) > 0 {
 			this.active = time.Now()
-			this.synscanner.Syn(ip[0], layers.TCPPort(port))
+			for _, ipaddr := range ip {
+				if ipaddr = ipaddr.To4(); ipaddr == nil {
+					logs.Error("ip.To4 error.")
+					continue
+				}
+				this.active = time.Now()
+				this.synscanner.Syn(ipaddr, layers.TCPPort(port))
+				break
+			}
 		} else {
 			logs.Warn("%s resolution failed", ipStr)
+			return
 		}
 	} else {
 		this.active = time.Now()
