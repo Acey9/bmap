@@ -105,7 +105,8 @@ func (this *Worker) output(res *Response) {
 		logs.Error(err)
 	}
 	if out != "" {
-		logs.Info("%s %s", this.name, out)
+		//logs.Info("%s %s", this.name, out)
+		logs.Info("res %s", out)
 	}
 }
 
@@ -261,14 +262,19 @@ func (this *Worker) pushTarget(addr string) {
 		}
 		this.active = time.Now()
 		this.synscanner.Syn(ip, layers.TCPPort(port))
-	} else if ip, err := net.LookupIP(ipStr); err == nil {
+	} else if this.settings.SynScan {
+		ip, err := net.LookupIP(ipStr)
+		if err != nil {
+			logs.Error(err)
+			return
+		}
 		port, err := strconv.Atoi(portStr)
 		if err != nil {
 			logs.Error(err)
 			return
 		}
-		this.active = time.Now()
 		if len(ip) > 0 {
+			this.active = time.Now()
 			this.synscanner.Syn(ip[0], layers.TCPPort(port))
 		} else {
 			logs.Warn("%s resolution failed", ipStr)
