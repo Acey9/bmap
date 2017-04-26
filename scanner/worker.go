@@ -123,22 +123,34 @@ func (this *Worker) readSynAck() {
 
 		packet := gopacket.NewPacket(data, layers.LayerTypeEthernet, gopacket.NoCopy)
 
-		if net := packet.NetworkLayer(); net == nil {
-		} else if ipLayer := packet.Layer(layers.LayerTypeIPv4); ipLayer == nil {
-			//
-		} else if ip, ok := ipLayer.(*layers.IPv4); !ok {
-			//
-		} else if tcpLayer := packet.Layer(layers.LayerTypeTCP); tcpLayer == nil {
-			//
-		} else if tcp, ok := tcpLayer.(*layers.TCP); !ok {
-			//
-		} else if tcp.DstPort != this.synscanner.Sport(ip.SrcIP) {
-			//
-		} else if tcp.RST {
-			//
-		} else if tcp.SYN && tcp.ACK && tcp.Ack == this.synscanner.Seq(ip.SrcIP) {
-			//fmt.Println(ip.SrcIP, tcp.SrcPort, ip.DstIP, tcp.DstPort, tcp.Seq, tcp.Ack)
+		net := packet.NetworkLayer()
+		if net == nil {
+			continue
+		}
 
+		ipLayer := packet.Layer(layers.LayerTypeIPv4)
+		if ipLayer == nil {
+			continue
+		}
+		ip, ok := ipLayer.(*layers.IPv4)
+		if !ok {
+			continue
+		}
+
+		tcpLayer := packet.Layer(layers.LayerTypeTCP)
+		if tcpLayer == nil {
+			continue
+		}
+		tcp, ok := tcpLayer.(*layers.TCP)
+		if !ok {
+			continue
+		}
+
+		if tcp.DstPort != this.synscanner.Sport(ip.SrcIP) {
+			continue
+		}
+
+		if tcp.SYN && tcp.ACK && tcp.Ack == this.synscanner.Seq(ip.SrcIP) {
 			addr := bytes.Buffer{}
 			addr.WriteString(ip.SrcIP.String())
 			addr.WriteString(":")
@@ -151,10 +163,6 @@ func (this *Worker) readSynAck() {
 			} else {
 				this.AddTarget(addr.String())
 			}
-
-			//logs.Info("%v  port %v open", ip.SrcIP, tcp.SrcPort)
-		} else {
-			//
 		}
 	}
 }
