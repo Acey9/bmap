@@ -304,11 +304,15 @@ func (this *Worker) pushTarget(addr string) {
 
 func (this *Worker) waittingForEnd() {
 	sleep := time.Millisecond * time.Duration(1)
+	start := time.Now()
 	for {
 		if time.Since(this.active) > time.Second*time.Duration(this.settings.Timeout) {
 			break
 		}
 		time.Sleep(sleep)
+		if time.Since(start) > time.Second*time.Duration(5*60) {
+			break
+		}
 	}
 }
 
