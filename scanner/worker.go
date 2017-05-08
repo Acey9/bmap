@@ -32,9 +32,11 @@ type Worker struct {
 	responseCount int
 	synscanner    *SynScanner
 	active        time.Time
+	session       *Session
 }
 
 func initWorker(name string, s Scanner) error {
+	session := NewSesson()
 	worker = &Worker{
 		name:          name,
 		scanner:       s,
@@ -43,7 +45,8 @@ func initWorker(name string, s Scanner) error {
 		targetQueue:   make(chan *Target),
 		responseQueue: make(chan *Response),
 		requestCount:  0,
-		responseCount: 0}
+		responseCount: 0,
+		session:       session}
 	worker.loadWhitelist()
 
 	synscanner, err := NewSynScanner()
@@ -155,6 +158,10 @@ func (this *Worker) readSynAck() {
 			addr.WriteString(ip.SrcIP.String())
 			addr.WriteString(":")
 			addr.WriteString(strconv.Itoa(int(tcp.SrcPort)))
+			if this.session.QuerySession(addr.String()) {
+				continue
+			}
+			this.session.AddSession(addr.String())
 
 			if this.settings.SynScan {
 				resp := bytes.Buffer{}
