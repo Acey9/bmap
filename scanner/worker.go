@@ -31,6 +31,7 @@ type Worker struct {
 	requestCount  int
 	responseCount int
 	synscanner    *SynScanner
+	synScanCount  uint64
 	active        time.Time
 	session       *Session
 }
@@ -264,6 +265,11 @@ func (this *Worker) pushTarget(addr string) {
 		}
 	}
 
+	if this.synScanCount > this.settings.SynScanRate {
+		this.synScanCount = 0
+		time.Sleep(time.Millisecond * time.Duration(1000))
+	}
+
 	ip := net.ParseIP(ipStr)
 	if ip != nil {
 		if ip = ip.To4(); ip == nil {
@@ -276,6 +282,7 @@ func (this *Worker) pushTarget(addr string) {
 			return
 		}
 		this.active = time.Now()
+		this.synScanCount++
 		this.synscanner.Syn(ip, layers.TCPPort(port))
 	} else if this.settings.SynScan {
 		ip, err := net.LookupIP(ipStr)
@@ -296,6 +303,7 @@ func (this *Worker) pushTarget(addr string) {
 					continue
 				}
 				this.active = time.Now()
+				this.synScanCount++
 				this.synscanner.Syn(ipaddr, layers.TCPPort(port))
 				break
 			}

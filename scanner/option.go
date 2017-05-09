@@ -24,6 +24,7 @@ type Settings struct {
 	Args          []string
 	Ports         []uint16
 	SynScan       bool
+	SynScanRate   uint64
 	Timeout       int
 }
 
@@ -168,6 +169,7 @@ func optParse() {
 	flag.StringVar(&settings.WhitelistFile, "w", "", "Input whitelist from list of hosts/networks")
 
 	flag.BoolVar(&settings.SynScan, "sS", false, "Only syn scan")
+	flag.Uint64Var(&settings.SynScanRate, "r", 3000, "The number of packets per second")
 
 	flag.IntVar(&settings.Concurrency, "c", 10, "Concurrency")
 	flag.IntVar(&settings.Gomaxprocs, "g", 0, "Go max procs")
