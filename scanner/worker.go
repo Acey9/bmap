@@ -322,10 +322,12 @@ func (this *Worker) waittingForEnd() {
 	start := time.Now()
 	for {
 		if time.Since(this.active) > time.Second*time.Duration(this.settings.Timeout) {
+			logs.Info("waittingForEnd: inactive")
 			break
 		}
 		time.Sleep(sleep)
 		if time.Since(start) > time.Second*time.Duration(5*60) {
+			logs.Info("waittingForEnd: timeout")
 			break
 		}
 	}

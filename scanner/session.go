@@ -2,27 +2,34 @@ package scanner
 
 import (
 	//"fmt"
+	"sync"
 	"time"
 )
 
 const SessionExpired = 300
 
 type Session struct {
-	tab map[string]time.Time
+	tab      map[string]time.Time
+	cntMutex *sync.Mutex
 }
 
 func NewSesson() *Session {
-	s := &Session{tab: make(map[string]time.Time)}
+	s := &Session{tab: make(map[string]time.Time),
+		cntMutex: &sync.Mutex{}}
 	go s.clean()
 	return s
 }
 
 func (s *Session) AddSession(sid string) {
 	//fmt.Println("AddSession:", sid)
+	s.cntMutex.Lock()
+	defer s.cntMutex.Unlock()
 	s.tab[sid] = time.Now()
 }
 
 func (s *Session) QuerySession(sid string) bool {
+	s.cntMutex.Lock()
+	defer s.cntMutex.Unlock()
 	_, ok := s.tab[sid]
 	if ok {
 		return true
@@ -32,6 +39,8 @@ func (s *Session) QuerySession(sid string) bool {
 
 func (s *Session) DeleteSession(sid string) {
 	//fmt.Println("DeleteSession:", sid)
+	s.cntMutex.Lock()
+	defer s.cntMutex.Unlock()
 	delete(s.tab, sid)
 }
 
