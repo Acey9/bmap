@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-const SessionExpired = 300
+const SessionExpired = 180
 
 type Session struct {
 	tab      map[string]time.Time
