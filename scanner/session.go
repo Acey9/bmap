@@ -10,12 +10,12 @@ const SessionExpired = 300
 
 type Session struct {
 	tab      map[string]time.Time
-	cntMutex *sync.Mutex
+	cntMutex *sync.RWMutex
 }
 
 func NewSesson() *Session {
 	s := &Session{tab: make(map[string]time.Time),
-		cntMutex: &sync.Mutex{}}
+		cntMutex: &sync.RWMutex{}}
 	go s.clean()
 	return s
 }
