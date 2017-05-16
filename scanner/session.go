@@ -1,7 +1,7 @@
 package scanner
 
 import (
-	//"fmt"
+	"fmt"
 	"sync"
 	"time"
 )
@@ -44,14 +44,24 @@ func (s *Session) DeleteSession(sid string) {
 	delete(s.tab, sid)
 }
 
+func (s *Session) del() {
+	defer func() {
+		if err := recover(); err != nil {
+			fmt.Println("del session error:", err)
+		}
+	}()
+
+	for k, v := range s.tab {
+		if time.Since(v) > time.Second*SessionExpired {
+			s.DeleteSession(k)
+		}
+	}
+}
+
 func (s *Session) clean() {
 	sleep := time.Millisecond * time.Duration(1000)
 	for {
-		for k, v := range s.tab {
-			if time.Since(v) > time.Second*SessionExpired {
-				s.DeleteSession(k)
-			}
-		}
+		s.del()
 		time.Sleep(sleep)
 	}
 }
