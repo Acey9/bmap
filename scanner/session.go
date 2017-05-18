@@ -1,7 +1,6 @@
 package scanner
 
 import (
-	"fmt"
 	"sync"
 	"time"
 )
@@ -28,8 +27,8 @@ func (s *Session) AddSession(sid string) {
 }
 
 func (s *Session) QuerySession(sid string) bool {
-	s.cntMutex.Lock()
-	defer s.cntMutex.Unlock()
+	s.cntMutex.RLock()
+	defer s.cntMutex.RUnlock()
 	_, ok := s.tab[sid]
 	if ok {
 		return true
@@ -45,21 +44,17 @@ func (s *Session) DeleteSession(sid string) {
 }
 
 func (s *Session) del() {
-	defer func() {
-		if err := recover(); err != nil {
-			fmt.Println("del session error:", err)
-		}
-	}()
-
+	s.cntMutex.Lock()
+	defer s.cntMutex.Unlock()
 	for k, v := range s.tab {
 		if time.Since(v) > time.Second*SessionExpired {
-			s.DeleteSession(k)
+			delete(s.tab, k)
 		}
 	}
 }
 
 func (s *Session) clean() {
-	sleep := time.Millisecond * time.Duration(1000)
+	sleep := time.Millisecond * time.Duration(10000)
 	for {
 		s.del()
 		time.Sleep(sleep)
