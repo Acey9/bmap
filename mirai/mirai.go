@@ -16,7 +16,7 @@ const CONNTIMEOUT = 5
 const WRITETIMEOUT = 3
 const READTIMEOUT = 5
 
-const LOGINMSG string = "\x00\x00\x00\x01\x0a\x74\x65\x6c\x6e\x65\x74\x2e\x78\x38\x36"
+const LOGINMSG string = "\x00\x00\x00\x01\x00"
 const HEARTBEAT = "\x13\x7f"
 
 type Bot struct {
@@ -80,7 +80,7 @@ func (bot *Bot) Login() (int, error) {
 	time.Sleep(sleep)
 
 	bot.conn.SetWriteDeadline(time.Now().Add(time.Second * WRITETIMEOUT))
-	_, err = bot.conn.Write(loginMsg[4:15])
+	_, err = bot.conn.Write(loginMsg[4:5])
 	if err != nil {
 		return NETERROR, err
 	}
