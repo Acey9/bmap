@@ -93,7 +93,7 @@ func (bot *Bot) Login() (int, error) {
 		return NETERROR, err
 	}
 
-	ackBuf := make([]byte, 3)
+	ackBuf := make([]byte, 4)
 
 	bot.conn.SetReadDeadline(time.Now().Add(time.Second * READTIMEOUT))
 	n, err := bot.conn.Read(ackBuf)
@@ -108,12 +108,16 @@ func (bot *Bot) Login() (int, error) {
 func (bot *Bot) confirm(n int, ackBuf, heartbeat []byte) int {
 	if n == ACKLEN && ackBuf[0] == heartbeat[0] && ackBuf[1] == heartbeat[1] {
 
-		hb := []byte("\x13\xff")
+		hb := []byte("\x13\xff\x6b\x63")
 		bcount := 0
-		for i := 0; i < 3; i++ {
-			buf := make([]byte, 3)
+		for i := 0; i < 2; i++ {
+			buf := make([]byte, 4)
 			bot.conn.SetWriteDeadline(time.Now().Add(time.Second * WRITETIMEOUT))
-			bot.conn.Write(hb)
+			if i == 0 {
+				bot.conn.Write(hb[0:2])
+			} else {
+				bot.conn.Write(hb[2:])
+			}
 
 			bot.conn.SetReadDeadline(time.Now().Add(time.Second * READTIMEOUT))
 			ln, err := bot.conn.Read(buf)
@@ -121,15 +125,18 @@ func (bot *Bot) confirm(n int, ackBuf, heartbeat []byte) int {
 				continue
 			}
 
-			if ln == ACKLEN && buf[0] == hb[0] && buf[1] == hb[1] {
+			if ln != ACKLEN {
+				return UNKNOWN
+			}
+			if ln == ACKLEN && ((buf[0] == hb[0] && buf[1] == hb[1]) || (buf[0] == hb[2] && buf[1] == hb[3])) {
 				bcount++
 			}
 			time.Sleep(time.Millisecond * 1000)
 		}
-		if bcount == 0 {
-			return UNKNOWN
-		} else {
+		if bcount == 2 {
 			return MIRAI
+		} else {
+			return UNKNOWN
 		}
 	}
 	return UNKNOWN
